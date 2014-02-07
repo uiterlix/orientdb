@@ -29,6 +29,7 @@ import org.testng.Assert;
 import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
 
+import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.orient.core.db.ODatabaseComplex.OPERATION_MODE;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocumentPool;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx;
@@ -950,21 +951,32 @@ public class CRUDDocumentPhysicalTest {
     }
   }
 
+  @SuppressWarnings({ "rawtypes", "unchecked" })
   @Test(dependsOnMethods = "testUpdateInChain")
   public void testJavaReferences() {
     database = ODatabaseDocumentPool.global().acquire(url, "admin", "admin");
     database.getLevel1Cache().setEnable(true);
     database.getLevel2Cache().setEnable(true);
     try {
-      database.begin(OTransaction.TXTYPE.OPTIMISTIC);
+      // database.begin(OTransaction.TXTYPE.OPTIMISTIC);
       ODocument top = database.newInstance("Top");
       ODocument sub = database.newInstance("Sub");
       top.field("value", "MYVALUE");
       top.field("sub", sub);
-      sub.field("parent", top);
+      sub.field("top", top);
+      OLogManager.instance().info(this, database.getLevel1Cache().toString());
+      OLogManager.instance().info(this, database.getLevel2Cache().toString());
       database.save(top);
-      database.commit();
+      OLogManager.instance().info(this, database.getLevel1Cache().toString());
+      OLogManager.instance().info(this, database.getLevel2Cache().toString());
+      OLogManager.instance().info(this, database.getLevel1Cache().findRecord(top.getIdentity()).toString());
+      OLogManager.instance().info(this, database.getLevel1Cache().findRecord(sub.getIdentity()).toString());
+      // database.commit();
       List<ODocument> tops = database.query(new OSQLSynchQuery("SELECT * FROM Top"));
+      OLogManager.instance().info(this, database.getLevel1Cache().toString());
+      OLogManager.instance().info(this, database.getLevel2Cache().toString());
+      OLogManager.instance().info(this, database.getLevel1Cache().findRecord(top.getIdentity()).toString());
+      OLogManager.instance().info(this, database.getLevel1Cache().findRecord(sub.getIdentity()).toString());
       ODocument queriedTop = tops.iterator().next();
       ODocument subTop = ((ODocument) ((ODocument) queriedTop.field("sub")).field("top"));
       Assert.assertTrue(queriedTop == subTop);
