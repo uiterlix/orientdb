@@ -17,7 +17,17 @@ package com.orientechnologies.orient.test.database.auto;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collection;
+import java.util.ConcurrentModificationException;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.testng.Assert;
 import org.testng.annotations.Parameters;
@@ -25,7 +35,12 @@ import org.testng.annotations.Test;
 
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.orient.core.db.object.OLazyObjectSetInterface;
-import com.orientechnologies.orient.core.db.record.*;
+import com.orientechnologies.orient.core.db.record.ORecordLazyList;
+import com.orientechnologies.orient.core.db.record.ORecordLazyMap;
+import com.orientechnologies.orient.core.db.record.ORecordLazySet;
+import com.orientechnologies.orient.core.db.record.OTrackedList;
+import com.orientechnologies.orient.core.db.record.OTrackedMap;
+import com.orientechnologies.orient.core.db.record.OTrackedSet;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.exception.OQueryParsingException;
 import com.orientechnologies.orient.core.exception.OSerializationException;
@@ -34,7 +49,9 @@ import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.metadata.security.OUser;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.record.impl.ORecordBytes;
+import com.orientechnologies.orient.core.sql.OCommandSQL;
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery;
+import com.orientechnologies.orient.core.tx.OTransaction;
 import com.orientechnologies.orient.core.tx.OTransaction.TXTYPE;
 import com.orientechnologies.orient.core.type.tree.OMVRBTreeRIDSet;
 import com.orientechnologies.orient.enterprise.channel.binary.OResponseProcessingException;
@@ -42,8 +59,25 @@ import com.orientechnologies.orient.object.db.OObjectDatabasePool;
 import com.orientechnologies.orient.object.db.OObjectDatabaseTx;
 import com.orientechnologies.orient.object.iterator.OObjectIteratorClass;
 import com.orientechnologies.orient.object.iterator.OObjectIteratorCluster;
-import com.orientechnologies.orient.test.domain.base.*;
-import com.orientechnologies.orient.test.domain.business.*;
+import com.orientechnologies.orient.test.domain.base.Agenda;
+import com.orientechnologies.orient.test.domain.base.EmbeddedChild;
+import com.orientechnologies.orient.test.domain.base.EnumTest;
+import com.orientechnologies.orient.test.domain.base.Event;
+import com.orientechnologies.orient.test.domain.base.JavaComplexTestClass;
+import com.orientechnologies.orient.test.domain.base.JavaNoGenericCollectionsTestClass;
+import com.orientechnologies.orient.test.domain.base.JavaSimpleArraysTestClass;
+import com.orientechnologies.orient.test.domain.base.JavaSimpleTestClass;
+import com.orientechnologies.orient.test.domain.base.JavaTestInterface;
+import com.orientechnologies.orient.test.domain.base.Media;
+import com.orientechnologies.orient.test.domain.base.Parent;
+import com.orientechnologies.orient.test.domain.base.PersonTest;
+import com.orientechnologies.orient.test.domain.base.transaction.Sub;
+import com.orientechnologies.orient.test.domain.base.transaction.Top;
+import com.orientechnologies.orient.test.domain.business.Account;
+import com.orientechnologies.orient.test.domain.business.Address;
+import com.orientechnologies.orient.test.domain.business.Child;
+import com.orientechnologies.orient.test.domain.business.City;
+import com.orientechnologies.orient.test.domain.business.Country;
 import com.orientechnologies.orient.test.domain.whiz.Profile;
 
 @Test(groups = { "crud", "object" })
@@ -2051,6 +2085,39 @@ public class CRUDObjectPhysicalTest {
       database.close();
     }
   }
+
+  // TODO make id work once java references is fixed
+  // @SuppressWarnings("rawtypes")
+  // @Test(dependsOnMethods = "testNoGenericCollectionsWrongAdding")
+  // public void attributesUpdateTest() {
+  // database = OObjectDatabasePool.global().acquire(url, "admin", "admin");
+  // database.getLevel1Cache().setEnable(true);
+  // database.getLevel2Cache().setEnable(true);
+  // try {
+  // database.begin(OTransaction.TXTYPE.OPTIMISTIC);
+  // Top top = new Top();
+  // Sub sub = new Sub();
+  // top.setValue("MYVALUE");
+  // top.setSub(sub);
+  // sub.setTop(top);
+  // database.save(top);
+  // database.commit();
+  //
+  // List<Top> tops = database.query(new OSQLSynchQuery("SELECT * FROM Top"));
+  // Top queriedTop = tops.iterator().next();
+  // Assert.assertEquals(queriedTop.getValue(), "MYVALUE");
+  // Assert.assertEquals(queriedTop.getSub().getTop().getValue(), "MYVALUE");
+  // queriedTop.setValue("NEWVALUE");
+  // Assert.assertEquals(queriedTop.getValue(), "NEWVALUE");
+  //
+  // // fails! why?
+  // Assert.assertEquals(queriedTop.getSub().getTop().getValue(), "NEWVALUE");
+  // database.command(new OCommandSQL("delete from Top")).execute();
+  // database.command(new OCommandSQL("delete from Sub")).execute();
+  // } finally {
+  // database.close();
+  // }
+  // }
 
   @Test(dependsOnMethods = "testNoGenericCollectionsWrongAdding")
   public void oidentifableFieldsTest() {

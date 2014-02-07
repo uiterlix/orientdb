@@ -15,6 +15,20 @@
  */
 package com.orientechnologies.orient.test.database.auto;
 
+import java.io.IOException;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.testng.Assert;
+import org.testng.annotations.Parameters;
+import org.testng.annotations.Test;
+
 import com.orientechnologies.orient.core.db.ODatabaseComplex.OPERATION_MODE;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocumentPool;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx;
@@ -29,23 +43,13 @@ import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.ORecordAbstract;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.serialization.OBase64Utils;
+import com.orientechnologies.orient.core.sql.OCommandSQL;
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery;
 import com.orientechnologies.orient.core.storage.ORecordCallback;
+import com.orientechnologies.orient.core.tx.OTransaction;
 import com.orientechnologies.orient.core.version.ORecordVersion;
 import com.orientechnologies.orient.core.version.OVersionFactory;
-import org.testng.Assert;
-import org.testng.annotations.Parameters;
-import org.testng.annotations.Test;
-
-import java.io.IOException;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
+import com.orientechnologies.orient.test.domain.base.transaction.Top;
 
 @Test(groups = { "crud", "record-vobject" }, sequential = true)
 public class CRUDDocumentPhysicalTest {
@@ -941,6 +945,38 @@ public class CRUDDocumentPhysicalTest {
         l.delete();
       bank.delete();
 
+    } finally {
+      database.close();
+    }
+  }
+
+  @Test(dependsOnMethods = "testUpdateInChain")
+  public void testJavaReferences() {
+    database = ODatabaseDocumentPool.global().acquire(url, "admin", "admin");
+    database.getLevel1Cache().setEnable(true);
+    database.getLevel2Cache().setEnable(true);
+    try {
+      database.begin(OTransaction.TXTYPE.OPTIMISTIC);
+      ODocument top = database.newInstance("Top");
+      ODocument sub = database.newInstance("Sub");
+      top.field("value", "MYVALUE");
+      top.field("sub", sub);
+      sub.field("parent", top);
+      database.save(top);
+      database.commit();
+      List<ODocument> tops = database.query(new OSQLSynchQuery("SELECT * FROM Top"));
+      ODocument queriedTop = tops.iterator().next();
+      ODocument subTop = ((ODocument) ((ODocument) queriedTop.field("sub")).field("top"));
+      Assert.assertTrue(queriedTop == subTop);
+      Assert.assertEquals(queriedTop.field("value"), "MYVALUE");
+      Assert.assertEquals(((ODocument) ((ODocument) queriedTop.field("sub")).field("top")).field("value"), "MYVALUE");
+      queriedTop.field("value", "MYVALUE");
+      Assert.assertEquals(queriedTop.field("value"), "NEWVALUE");
+
+      // fails! why?
+      Assert.assertEquals(((ODocument) ((ODocument) queriedTop.field("sub")).field("top")).field("value"), "NEWVALUE");
+      database.command(new OCommandSQL("delete from Top")).execute();
+      database.command(new OCommandSQL("delete from Sub")).execute();
     } finally {
       database.close();
     }

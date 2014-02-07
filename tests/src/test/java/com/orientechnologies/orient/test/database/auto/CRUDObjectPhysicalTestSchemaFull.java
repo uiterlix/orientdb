@@ -35,7 +35,9 @@ import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.metadata.security.OUser;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.record.impl.ORecordBytes;
+import com.orientechnologies.orient.core.sql.OCommandSQL;
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery;
+import com.orientechnologies.orient.core.tx.OTransaction;
 import com.orientechnologies.orient.core.tx.OTransaction.TXTYPE;
 import com.orientechnologies.orient.core.type.tree.OMVRBTreeRIDSet;
 import com.orientechnologies.orient.enterprise.channel.binary.OResponseProcessingException;
@@ -44,6 +46,8 @@ import com.orientechnologies.orient.object.db.OObjectDatabaseTx;
 import com.orientechnologies.orient.object.iterator.OObjectIteratorClass;
 import com.orientechnologies.orient.object.iterator.OObjectIteratorCluster;
 import com.orientechnologies.orient.test.domain.base.*;
+import com.orientechnologies.orient.test.domain.base.transaction.Sub;
+import com.orientechnologies.orient.test.domain.base.transaction.Top;
 import com.orientechnologies.orient.test.domain.business.*;
 import com.orientechnologies.orient.test.domain.whiz.Profile;
 
@@ -2033,8 +2037,37 @@ public class CRUDObjectPhysicalTestSchemaFull {
       database.close();
     }
   }
-
+  
   @Test(dependsOnMethods = "testNoGenericCollectionsWrongAdding")
+  public void attributesUpdateTest() {
+    database = OObjectDatabasePool.global().acquire(url, "admin", "admin");
+    try {
+      database.begin(OTransaction.TXTYPE.OPTIMISTIC);
+      Top top = new Top();
+      Sub sub = new Sub();
+      top.setValue("MYVALUE");
+      top.setSub(sub);
+      sub.setTop(top);
+      database.save(top);
+      database.commit();
+
+      List<Top> tops = database.query(new OSQLSynchQuery("SELECT * FROM Top"));
+      Top queriedTop = tops.iterator().next();
+      Assert.assertEquals(queriedTop.getValue(), "MYVALUE");
+      Assert.assertEquals(queriedTop.getSub().getTop().getValue(), "MYVALUE");
+      queriedTop.setValue("NEWVALUE");
+      Assert.assertEquals(queriedTop.getValue(), "NEWVALUE");
+
+      // fails! why?
+      Assert.assertEquals(queriedTop.getSub().getTop().getValue(), "NEWVALUE");
+      database.command(new OCommandSQL("delete from Top")).execute();
+      database.command(new OCommandSQL("delete from Sub")).execute();
+    } finally {
+      database.close();
+    }
+  }
+
+  @Test(dependsOnMethods = "attributesUpdateTest")
   public void oidentifableFieldsTest() {
     database = OObjectDatabasePool.global().acquire(url, "admin", "admin");
     try {
