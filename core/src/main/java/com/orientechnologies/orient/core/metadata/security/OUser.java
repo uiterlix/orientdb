@@ -15,17 +15,18 @@
  */
 package com.orientechnologies.orient.core.metadata.security;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
-
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.orient.core.annotation.OAfterDeserialization;
+import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.exception.OSecurityAccessException;
 import com.orientechnologies.orient.core.exception.OSecurityException;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.security.OSecurityManager;
 import com.orientechnologies.orient.core.type.ODocumentWrapper;
+
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Contains the user settings about security and permissions. Each user has one or more roles associated. Roles contains the
@@ -36,17 +37,11 @@ import com.orientechnologies.orient.core.type.ODocumentWrapper;
  * @see ORole
  */
 public class OUser extends ODocumentWrapper {
-  private static final long  serialVersionUID = 1L;
-
   public static final String ADMIN            = "admin";
   public static final String CLASS_NAME       = "OUser";
-
-  public enum STATUSES {
-    SUSPENDED, ACTIVE
-  }
-
+  private static final long  serialVersionUID = 1L;
   // AVOID THE INVOCATION OF SETTER
-  protected Set<ORole> roles = new HashSet<ORole>();
+  protected Set<ORole>       roles            = new HashSet<ORole>();
 
   /**
    * Constructor used in unmarshalling.
@@ -74,6 +69,10 @@ public class OUser extends ODocumentWrapper {
     fromStream(iSource);
   }
 
+  public static final String encryptPassword(final String iPassword) {
+    return OSecurityManager.instance().digest2String(iPassword, true);
+  }
+
   @Override
   @OAfterDeserialization
   public void fromStream(final ODocument iSource) {
@@ -83,13 +82,14 @@ public class OUser extends ODocumentWrapper {
     document = iSource;
 
     roles = new HashSet<ORole>();
-    final Collection<ODocument> loadedRoles = iSource.field("roles");
+    final Collection<OIdentifiable> loadedRoles = iSource.field("roles");
     if (loadedRoles != null)
-      for (final ODocument d : loadedRoles) {
-        final ORole role = document.getDatabase().getMetadata().getSecurity().getRole((String) d.field("name"));
+      for (final OIdentifiable d : loadedRoles) {
+        final ODocument doc = d.getRecord();
+        final ORole role = document.getDatabase().getMetadata().getSecurity().getRole((String) doc.field("name"));
         if (role == null) {
           OLogManager.instance().warn(this, "User '%s' declare to have the role '%s' but it does not exist in database, skipt it",
-              getName(), d.field("name"));
+              getName(), doc.field("name"));
           document.getDatabase().getMetadata().getSecurity().repair();
         } else
           roles.add(role);
@@ -182,10 +182,6 @@ public class OUser extends ODocumentWrapper {
     return this;
   }
 
-  public static final String encryptPassword(final String iPassword) {
-    return OSecurityManager.instance().digest2String(iPassword, true);
-  }
-
   public STATUSES getAccountStatus() {
     final String status = (String) document.field("status");
     if (status == null)
@@ -229,5 +225,9 @@ public class OUser extends ODocumentWrapper {
   @Override
   public String toString() {
     return getName();
+  }
+
+  public enum STATUSES {
+    SUSPENDED, ACTIVE
   }
 }
