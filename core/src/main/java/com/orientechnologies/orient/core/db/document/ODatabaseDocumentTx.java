@@ -55,13 +55,24 @@ import java.util.List;
 
 @SuppressWarnings("unchecked")
 public class ODatabaseDocumentTx extends ODatabaseRecordWrapperAbstract<ODatabaseRecordTx> implements ODatabaseDocument {
+  protected static ORecordSerializer defaultSerializer = ORecordSerializerFactory.instance().getFormat(
+                                                           ORecordSerializerSchemaAware2CSV.NAME);
+
   public ODatabaseDocumentTx(final String iURL) {
     super(new ODatabaseRecordTx(iURL, ODocument.RECORD_TYPE));
-    underlying.setSerializer(ORecordSerializerFactory.instance().getFormat(ORecordSerializerSchemaAware2CSV.NAME));
+    underlying.setSerializer(defaultSerializer);
   }
 
   public ODatabaseDocumentTx(final ODatabaseRecordTx iSource) {
     super(iSource);
+  }
+
+  public static ORecordSerializer getDefaultSerializer() {
+    return defaultSerializer;
+  }
+
+  public static void setDefaultSerializer(ORecordSerializer iDefaultSerializer) {
+    defaultSerializer = iDefaultSerializer;
   }
 
   @Override
@@ -432,12 +443,12 @@ public class ODatabaseDocumentTx extends ODatabaseRecordWrapperAbstract<ODatabas
     return rollback(false);
   }
 
-	@Override
-	public ODatabaseComplex<ORecordInternal<?>> rollback(boolean force) throws OTransactionException {
-		return underlying.rollback(force);
-	}
+  @Override
+  public ODatabaseComplex<ORecordInternal<?>> rollback(boolean force) throws OTransactionException {
+    return underlying.rollback(force);
+  }
 
-	public String getType() {
+  public String getType() {
     return TYPE;
   }
 
