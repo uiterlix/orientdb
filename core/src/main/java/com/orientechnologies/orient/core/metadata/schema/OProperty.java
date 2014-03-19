@@ -29,22 +29,20 @@ import java.util.Set;
  */
 public interface OProperty extends Comparable<OProperty> {
 
-  public static enum ATTRIBUTES {
-    LINKEDTYPE, LINKEDCLASS, MIN, MAX, MANDATORY, NAME, NOTNULL, REGEXP, TYPE, CUSTOM, READONLY, COLLATE
-  }
-
   public String getName();
+
+  public OProperty setName(String iName);
 
   /**
    * Returns the full name as <class>.<property>
    */
   public String getFullName();
 
-  public OProperty setName(String iName);
-
   public void set(ATTRIBUTES attribute, Object iValue);
 
   public OType getType();
+
+  boolean isFixedSize();
 
   /**
    * Returns the linked class in lazy mode because while unmarshalling the class could be not loaded yet.
@@ -207,4 +205,10 @@ public interface OProperty extends Comparable<OProperty> {
   public OClass getOwnerClass();
 
   public Object get(ATTRIBUTES iAttribute);
+
+  public int getPersistentOffset();
+
+  public static enum ATTRIBUTES {
+    LINKEDTYPE, LINKEDCLASS, MIN, MAX, MANDATORY, NAME, NOTNULL, REGEXP, TYPE, CUSTOM, READONLY, COLLATE
+  }
 }

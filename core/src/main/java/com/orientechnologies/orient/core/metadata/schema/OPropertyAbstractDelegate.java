@@ -220,7 +220,17 @@ public class OPropertyAbstractDelegate implements OProperty {
   }
 
   @Override
+  public int getPersistentOffset() {
+    return delegate.getPersistentOffset();
+  }
+
+  @Override
   public int compareTo(OProperty o) {
     return delegate.compareTo(o);
+  }
+
+  @Override
+  public boolean isFixedSize() {
+    return delegate.isFixedSize();
   }
 }

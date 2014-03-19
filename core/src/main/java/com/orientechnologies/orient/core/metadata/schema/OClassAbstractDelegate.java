@@ -16,13 +16,13 @@
 
 package com.orientechnologies.orient.core.metadata.schema;
 
-import com.orientechnologies.common.listener.OProgressListener;
-import com.orientechnologies.orient.core.index.OIndex;
-import com.orientechnologies.orient.core.record.impl.ODocument;
-
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Set;
+
+import com.orientechnologies.common.listener.OProgressListener;
+import com.orientechnologies.orient.core.index.OIndex;
+import com.orientechnologies.orient.core.record.impl.ODocument;
 
 /**
  * Abstract Delegate for OClass interface.
@@ -135,6 +135,11 @@ public class OClassAbstractDelegate implements OClass {
   @Override
   public int getDefaultClusterId() {
     return delegate.getDefaultClusterId();
+  }
+
+  @Override
+  public void setDefaultClusterId(int iDefaultClusterId) {
+    delegate.setDefaultClusterId(iDefaultClusterId);
   }
 
   @Override
@@ -299,11 +304,6 @@ public class OClassAbstractDelegate implements OClass {
   }
 
   @Override
-  public void setDefaultClusterId(int iDefaultClusterId) {
-    delegate.setDefaultClusterId(iDefaultClusterId);
-  }
-
-  @Override
   public String getCustom(String iName) {
     return delegate.getCustom(iName);
   }
@@ -331,5 +331,10 @@ public class OClassAbstractDelegate implements OClass {
   @Override
   public int compareTo(OClass o) {
     return delegate.compareTo(o);
+  }
+
+  @Override
+  public int getPersistentSize() {
+    return delegate.getPersistentSize();
   }
 }

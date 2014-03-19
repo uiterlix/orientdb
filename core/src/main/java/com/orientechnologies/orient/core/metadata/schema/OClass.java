@@ -344,4 +344,6 @@ public interface OClass extends Comparable<OClass> {
   public void clearCustom();
 
   public Set<String> getCustomKeys();
+
+  public int getPersistentSize();
 }

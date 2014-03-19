@@ -15,13 +15,13 @@
  */
 package com.orientechnologies.orient.enterprise.channel.binary;
 
-import java.io.IOException;
-
 import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.record.ORecordInternal;
 import com.orientechnologies.orient.core.version.ORecordVersion;
+
+import java.io.IOException;
 
 /**
  * The range of the requests is 1-79.
@@ -108,7 +108,7 @@ public class OChannelBinaryProtocol {
   public static final short RECORD_RID                              = -3;
 
   // FOR MORE INFO: https://github.com/orientechnologies/orientdb/wiki/Network-Binary-Protocol#wiki-Compatibility
-  public static final int   CURRENT_PROTOCOL_VERSION                = 20; // SENT AS SHORT AS FIRST PACKET AFTER SOCKET CONNECTION
+  public static final int   CURRENT_PROTOCOL_VERSION                = 21; // SENT AS SHORT AS FIRST PACKET AFTER SOCKET CONNECTION
 
   public static OIdentifiable readIdentifiable(final OChannelBinaryAsynchClient network) throws IOException {
     final int classId = network.readShort();

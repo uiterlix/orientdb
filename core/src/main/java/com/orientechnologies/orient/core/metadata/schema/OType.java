@@ -15,6 +15,16 @@
  */
 package com.orientechnologies.orient.core.metadata.schema;
 
+import java.lang.reflect.Array;
+import java.math.BigDecimal;
+import java.text.ParseException;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.common.types.OBinary;
 import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
@@ -25,16 +35,6 @@ import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.serialization.OSerializableStream;
 import com.orientechnologies.orient.core.serialization.serializer.OStringSerializerHelper;
 import com.orientechnologies.orient.core.type.tree.OMVRBTreeRIDSet;
-
-import java.lang.reflect.Array;
-import java.math.BigDecimal;
-import java.text.ParseException;
-import java.util.Collection;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Generic representation of a type.<br/>
@@ -160,94 +160,6 @@ public enum OType {
     } while (comparedAtLeastOnce);
 
     return null;
-  }
-
-  /**
-   * Convert the input object to an integer.
-   * 
-   * @param iValue
-   *          Any type supported
-   * @return The integer value if the conversion succeed, otherwise the IllegalArgumentException exception
-   */
-  public int asInt(final Object iValue) {
-    if (iValue instanceof Number)
-      return ((Number) iValue).intValue();
-    else if (iValue instanceof String)
-      return Integer.valueOf((String) iValue);
-    else if (iValue instanceof Boolean)
-      return ((Boolean) iValue) ? 1 : 0;
-
-    throw new IllegalArgumentException("Cannot convert value " + iValue + " to int for type: " + name);
-  }
-
-  /**
-   * Convert the input object to a long.
-   * 
-   * @param iValue
-   *          Any type supported
-   * @return The long value if the conversion succeed, otherwise the IllegalArgumentException exception
-   */
-  public long asLong(final Object iValue) {
-    if (iValue instanceof Number)
-      return ((Number) iValue).longValue();
-    else if (iValue instanceof String)
-      return Long.valueOf((String) iValue);
-    else if (iValue instanceof Boolean)
-      return ((Boolean) iValue) ? 1 : 0;
-
-    throw new IllegalArgumentException("Cannot convert value " + iValue + " to long for type: " + name);
-  }
-
-  /**
-   * Convert the input object to a float.
-   * 
-   * @param iValue
-   *          Any type supported
-   * @return The float value if the conversion succeed, otherwise the IllegalArgumentException exception
-   */
-  public float asFloat(final Object iValue) {
-    if (iValue instanceof Number)
-      return ((Number) iValue).floatValue();
-    else if (iValue instanceof String)
-      return Float.valueOf((String) iValue);
-
-    throw new IllegalArgumentException("Cannot convert value " + iValue + " to float for type: " + name);
-  }
-
-  /**
-   * Convert the input object to a double.
-   * 
-   * @param iValue
-   *          Any type supported
-   * @return The double value if the conversion succeed, otherwise the IllegalArgumentException exception
-   */
-  public double asDouble(final Object iValue) {
-    if (iValue instanceof Number)
-      return ((Number) iValue).doubleValue();
-    else if (iValue instanceof String)
-      return Double.valueOf((String) iValue);
-
-    throw new IllegalArgumentException("Cannot convert value " + iValue + " to double for type: " + name);
-  }
-
-  /**
-   * Convert the input object to a string.
-   * 
-   * @param iValue
-   *          Any type supported
-   * @return The string if the conversion succeed, otherwise the IllegalArgumentException exception
-   */
-  public String asString(final Object iValue) {
-    return iValue.toString();
-  }
-
-  public boolean isMultiValue() {
-    return this == EMBEDDEDLIST || this == EMBEDDEDMAP || this == EMBEDDEDSET || this == LINKLIST || this == LINKMAP
-        || this == LINKSET;
-  }
-
-  public boolean isLink() {
-    return this == LINK || this == LINKSET || this == LINKLIST || this == LINKMAP;
   }
 
   public static boolean isSimpleType(final Object iObject) {
@@ -409,14 +321,6 @@ public enum OType {
     }
 
     return iValue;
-  }
-
-  public Class<?> getDefaultJavaType() {
-    return javaTypes.length > 0 ? javaTypes[0] : null;
-  }
-
-  public Class<?>[] getJavaTypes() {
-    return javaTypes;
   }
 
   public static Number increment(final Number a, final Number b) {
@@ -597,5 +501,105 @@ public enum OType {
     }
 
     return new Number[] { context, max };
+  }
+
+  /**
+   * Convert the input object to an integer.
+   * 
+   * @param iValue
+   *          Any type supported
+   * @return The integer value if the conversion succeed, otherwise the IllegalArgumentException exception
+   */
+  public int asInt(final Object iValue) {
+    if (iValue instanceof Number)
+      return ((Number) iValue).intValue();
+    else if (iValue instanceof String)
+      return Integer.valueOf((String) iValue);
+    else if (iValue instanceof Boolean)
+      return ((Boolean) iValue) ? 1 : 0;
+
+    throw new IllegalArgumentException("Cannot convert value " + iValue + " to int for type: " + name);
+  }
+
+  /**
+   * Convert the input object to a long.
+   * 
+   * @param iValue
+   *          Any type supported
+   * @return The long value if the conversion succeed, otherwise the IllegalArgumentException exception
+   */
+  public long asLong(final Object iValue) {
+    if (iValue instanceof Number)
+      return ((Number) iValue).longValue();
+    else if (iValue instanceof String)
+      return Long.valueOf((String) iValue);
+    else if (iValue instanceof Boolean)
+      return ((Boolean) iValue) ? 1 : 0;
+
+    throw new IllegalArgumentException("Cannot convert value " + iValue + " to long for type: " + name);
+  }
+
+  /**
+   * Convert the input object to a float.
+   * 
+   * @param iValue
+   *          Any type supported
+   * @return The float value if the conversion succeed, otherwise the IllegalArgumentException exception
+   */
+  public float asFloat(final Object iValue) {
+    if (iValue instanceof Number)
+      return ((Number) iValue).floatValue();
+    else if (iValue instanceof String)
+      return Float.valueOf((String) iValue);
+
+    throw new IllegalArgumentException("Cannot convert value " + iValue + " to float for type: " + name);
+  }
+
+  /**
+   * Convert the input object to a double.
+   * 
+   * @param iValue
+   *          Any type supported
+   * @return The double value if the conversion succeed, otherwise the IllegalArgumentException exception
+   */
+  public double asDouble(final Object iValue) {
+    if (iValue instanceof Number)
+      return ((Number) iValue).doubleValue();
+    else if (iValue instanceof String)
+      return Double.valueOf((String) iValue);
+
+    throw new IllegalArgumentException("Cannot convert value " + iValue + " to double for type: " + name);
+  }
+
+  /**
+   * Convert the input object to a string.
+   * 
+   * @param iValue
+   *          Any type supported
+   * @return The string if the conversion succeed, otherwise the IllegalArgumentException exception
+   */
+  public String asString(final Object iValue) {
+    return iValue.toString();
+  }
+
+  public boolean isMultiValue() {
+    return this == EMBEDDEDLIST || this == EMBEDDEDMAP || this == EMBEDDEDSET || this == LINKLIST || this == LINKMAP
+        || this == LINKSET;
+  }
+
+  public boolean isLink() {
+    return this == LINK || this == LINKSET || this == LINKLIST || this == LINKMAP;
+  }
+
+  public int getId() {
+    return id;
+  }
+
+  public Class<?> getDefaultJavaType() {
+    return javaTypes.length > 0 ? javaTypes[0] : null;
+  }
+
+  public Class<?>[] getJavaTypes() {
+    return javaTypes;
   }
 }

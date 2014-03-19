@@ -16,6 +16,8 @@
 package com.orientechnologies.orient.core.metadata.schema;
 
 import com.orientechnologies.common.comparator.OCaseInsentiveComparator;
+import com.orientechnologies.common.serialization.types.OBinarySerializer;
+import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.common.util.OCollections;
 import com.orientechnologies.orient.core.annotation.OBeforeSerialization;
 import com.orientechnologies.orient.core.collate.OCollate;
@@ -32,6 +34,7 @@ import com.orientechnologies.orient.core.metadata.security.ODatabaseSecurityReso
 import com.orientechnologies.orient.core.metadata.security.ORole;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.serialization.serializer.OStringSerializerHelper;
+import com.orientechnologies.orient.core.serialization.serializer.binary.OBinarySerializerFactory;
 import com.orientechnologies.orient.core.sql.OCommandSQL;
 import com.orientechnologies.orient.core.sql.OSQLEngine;
 import com.orientechnologies.orient.core.storage.OStorageProxy;
@@ -64,6 +67,10 @@ public class OPropertyImpl extends ODocumentWrapperNoClass implements OProperty 
   private boolean             readonly;
   private Map<String, String> customFields;
   private OCollate            collate = new ODefaultCollate();
+  private int                 persistentOffset;
+  private int                 persistentSize;
+
+  private boolean             isFixedSize;
 
   /**
    * Constructor used in unmarshalling.
@@ -71,10 +78,12 @@ public class OPropertyImpl extends ODocumentWrapperNoClass implements OProperty 
   public OPropertyImpl() {
   }
 
-  public OPropertyImpl(final OClassImpl iOwner, final String iName, final OType iType) {
+  public OPropertyImpl(final OClassImpl iOwner, final String iName, final OType iType, final int iOffset) {
     this(iOwner);
     name = iName;
     type = iType;
+    persistentOffset = iOffset;
+    computePersistentSize();
   }
 
   public OPropertyImpl(final OClassImpl iOwner) {
@@ -97,6 +106,14 @@ public class OPropertyImpl extends ODocumentWrapperNoClass implements OProperty 
 
   public OType getType() {
     return type;
+  }
+
+  public OPropertyImpl setType(final OType iType) {
+    getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA, ORole.PERMISSION_UPDATE);
+    final String cmd = String.format("alter property %s type %s", getFullName(), iType.toString());
+    getDatabase().command(new OCommandSQL(cmd)).execute();
+    type = iType;
+    return this;
   }
 
   public int compareTo(final OProperty o) {
@@ -349,6 +366,14 @@ public class OPropertyImpl extends ODocumentWrapperNoClass implements OProperty 
     return this;
   }
 
+  public boolean isFixedSize() {
+    return isFixedSize;
+  }
+
+  public int getPersistentOffset() {
+    return persistentOffset;
+  }
+
   public void setMaxInternal(final String iMax) {
     getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA, ORole.PERMISSION_UPDATE);
     this.max = iMax;
@@ -370,14 +395,6 @@ public class OPropertyImpl extends ODocumentWrapperNoClass implements OProperty 
   public void setRegexpInternal(final String iRegexp) {
     getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA, ORole.PERMISSION_UPDATE);
     this.regexp = iRegexp;
-  }
-
-  public OPropertyImpl setType(final OType iType) {
-    getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA, ORole.PERMISSION_UPDATE);
-    final String cmd = String.format("alter property %s type %s", getFullName(), iType.toString());
-    getDatabase().command(new OCommandSQL(cmd)).execute();
-    type = iType;
-    return this;
   }
 
   public String getCustom(final String iName) {
@@ -402,6 +419,10 @@ public class OPropertyImpl extends ODocumentWrapperNoClass implements OProperty 
     getDatabase().command(new OCommandSQL(cmd)).execute();
     setCustomInternal(iName, iValue);
     return this;
+  }
+
+  public int getPersistentSize() {
+    return persistentSize;
   }
 
   public Map<String, String> getCustomInternal() {
@@ -687,6 +708,8 @@ public class OPropertyImpl extends ODocumentWrapperNoClass implements OProperty 
     linkedType = document.field("linkedType") != null ? OType.getById(((Integer) document.field("linkedType")).byteValue()) : null;
     customFields = (Map<String, String>) (document.containsField("customFields") ? document
         .field("customFields", OType.EMBEDDEDMAP) : null);
+    persistentOffset = owner.getPersistentSize();
+    computePersistentSize();
   }
 
   public Collection<OIndex<?>> getAllIndexes() {
@@ -736,7 +759,7 @@ public class OPropertyImpl extends ODocumentWrapperNoClass implements OProperty 
       ((OSchemaProxy) getDatabase().getMetadata().getSchema()).saveInternal();
   }
 
-  private void checkForDateFormat(final String iDateAsString) {
+  protected void checkForDateFormat(final String iDateAsString) {
     if (iDateAsString != null)
       if (type == OType.DATE) {
         try {
@@ -755,5 +778,15 @@ public class OPropertyImpl extends ODocumentWrapperNoClass implements OProperty 
 
   protected ODatabaseRecord getDatabase() {
     return ODatabaseRecordThreadLocal.INSTANCE.get();
+  }
+
+  protected void computePersistentSize() {
+    final OBinarySerializer<Object> serializer = OBinarySerializerFactory.getInstance().getObjectSerializer(type);
+    if (serializer.isFixedLength())
+      persistentSize = serializer.getFixedLength();
+    else
+      // VARIABLE SIZE: FIXED SIZE = INT (OFFSET TO THE VAR CONTENT)
+      persistentSize = OIntegerSerializer.INT_SIZE;
+    isFixedSize = serializer.isFixedLength();
   }
 }

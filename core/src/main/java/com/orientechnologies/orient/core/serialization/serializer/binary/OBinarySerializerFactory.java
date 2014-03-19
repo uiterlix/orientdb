@@ -122,7 +122,7 @@ public class OBinarySerializerFactory {
   public static OBinarySerializerFactory create(int binaryFormatVersion) {
     final OBinarySerializerFactory factory = new OBinarySerializerFactory();
 
-    // STATELESS SERIALIER
+    // STATELESS SERIALIZER
     factory.registerSerializer(new ONullSerializer(), null);
 
     factory.registerSerializer(OBooleanSerializer.INSTANCE, OType.BOOLEAN);

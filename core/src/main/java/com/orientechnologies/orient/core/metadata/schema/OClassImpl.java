@@ -15,20 +15,6 @@
  */
 package com.orientechnologies.orient.core.metadata.schema;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Callable;
-
 import com.orientechnologies.common.listener.OProgressListener;
 import com.orientechnologies.common.util.OArrays;
 import com.orientechnologies.orient.core.annotation.OBeforeSerialization;
@@ -57,6 +43,10 @@ import com.orientechnologies.orient.core.storage.OStorage;
 import com.orientechnologies.orient.core.type.ODocumentWrapper;
 import com.orientechnologies.orient.core.type.ODocumentWrapperNoClass;
 
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.Callable;
+
 /**
  * Schema Class implementation.
  * 
@@ -65,24 +55,23 @@ import com.orientechnologies.orient.core.type.ODocumentWrapperNoClass;
  */
 @SuppressWarnings("unchecked")
 public class OClassImpl extends ODocumentWrapperNoClass implements OClass {
-  private static final long               serialVersionUID        = 1L;
-  private static final int                NOT_EXISTENT_CLUSTER_ID = -1;
-
-  protected OSchemaShared                 owner;
-  protected String                        name;
-  protected Class<?>                      javaClass;
-  protected final Map<String, OProperty>  properties              = new LinkedHashMap<String, OProperty>();
-
-  protected int[]                         clusterIds;
-  protected int                           defaultClusterId        = NOT_EXISTENT_CLUSTER_ID;
-  protected OClassImpl                    superClass;
-  protected int[]                         polymorphicClusterIds;
-  protected List<OClass>                  baseClasses;
-  protected float                         overSize                = 0f;
-  protected String                        shortName;
-  protected boolean                       strictMode              = false;                                 // @SINCE v1.0rc8
-  protected boolean                       abstractClass           = false;                                 // @SINCE v1.2.0
-  protected Map<String, String>           customFields;
+  private static final long              serialVersionUID        = 1L;
+  private static final int               NOT_EXISTENT_CLUSTER_ID = -1;
+  protected int                          defaultClusterId        = NOT_EXISTENT_CLUSTER_ID;
+  protected final Map<String, OProperty> properties              = new LinkedHashMap<String, OProperty>();
+  protected OSchemaShared                owner;
+  protected String                       name;
+  protected Class<?>                     javaClass;
+  protected int[]                        clusterIds;
+  protected OClassImpl                   superClass;
+  protected int[]                        polymorphicClusterIds;
+  protected List<OClass>                 baseClasses;
+  protected float                        overSize                = 0f;
+  protected String                       shortName;
+  protected boolean                      strictMode              = false;                                 // @SINCE v1.0rc8
+  protected boolean                      abstractClass           = false;                                 // @SINCE v1.2.0
+  protected Map<String, String>          customFields;
+  protected int                          persistentSize;
 
   /**
    * Constructor used in unmarshalling.
@@ -118,6 +107,34 @@ public class OClassImpl extends ODocumentWrapperNoClass implements OClass {
       setPolymorphicClusterIds(new int[0]);
     else
       setPolymorphicClusterIds(iClusterIds);
+  }
+
+  public static int[] readableClusters(final ODatabaseRecord iDatabase, final int[] iClusterIds) {
+    List<Integer> listOfReadableIds = new ArrayList<Integer>();
+
+    boolean all = true;
+    for (int clusterId : iClusterIds) {
+      try {
+        String clusterName = iDatabase.getClusterNameById(clusterId);
+        iDatabase.checkSecurity(ODatabaseSecurityResources.CLUSTER, ORole.PERMISSION_READ, clusterName);
+        listOfReadableIds.add(clusterId);
+      } catch (OSecurityAccessException securityException) {
+        all = false;
+        // if the cluster is inaccessible it's simply not processed in the list.add
+      }
+    }
+
+    if (all)
+      // JUST RETURN INPUT ARRAY (FASTER)
+      return iClusterIds;
+
+    int[] readableClusterIds = new int[listOfReadableIds.size()];
+    int index = 0;
+    for (int clusterId : listOfReadableIds) {
+      readableClusterIds[index++] = clusterId;
+    }
+
+    return readableClusterIds;
   }
 
   public <T> T newInstance() throws InstantiationException, IllegalAccessException {
@@ -484,14 +501,20 @@ public class OClassImpl extends ODocumentWrapperNoClass implements OClass {
     // READ PROPERTIES
     OPropertyImpl prop;
     Collection<ODocument> storedProperties = document.field("properties");
+    persistentSize = 0;
     if (storedProperties != null)
       for (ODocument p : storedProperties) {
         prop = new OPropertyImpl(this, p);
         prop.fromStream();
         properties.put(prop.getName().toLowerCase(), prop);
+        persistentSize += prop.getPersistentSize();
       }
 
     customFields = document.field("customFields", OType.EMBEDDEDMAP);
+  }
+
+  protected int computePersistentSize() {
+    return 0;
   }
 
   @Override
@@ -543,6 +566,11 @@ public class OClassImpl extends ODocumentWrapperNoClass implements OClass {
 
   public int[] getPolymorphicClusterIds() {
     return polymorphicClusterIds;
+  }
+
+  private void setPolymorphicClusterIds(final int[] iClusterIds) {
+    polymorphicClusterIds = iClusterIds;
+    Arrays.sort(polymorphicClusterIds);
   }
 
   public OClass addClusterId(final int iId) {
@@ -730,13 +758,13 @@ public class OClassImpl extends ODocumentWrapperNoClass implements OClass {
     return this;
   }
 
+  public float getOverSizeInternal() {
+    return overSize;
+  }
+
   public void setOverSizeInternal(final float overSize) {
     getDatabase().checkSecurity(ODatabaseSecurityResources.SCHEMA, ORole.PERMISSION_UPDATE);
     this.overSize = overSize;
-  }
-
-  public float getOverSizeInternal() {
-    return overSize;
   }
 
   public boolean isAbstract() {
@@ -849,34 +877,6 @@ public class OClassImpl extends ODocumentWrapperNoClass implements OClass {
       return getDatabase().countClusterElements(readableClusters(getDatabase(), polymorphicClusterIds));
 
     return getDatabase().countClusterElements(readableClusters(getDatabase(), clusterIds));
-  }
-
-  public static int[] readableClusters(final ODatabaseRecord iDatabase, final int[] iClusterIds) {
-    List<Integer> listOfReadableIds = new ArrayList<Integer>();
-
-    boolean all = true;
-    for (int clusterId : iClusterIds) {
-      try {
-        String clusterName = iDatabase.getClusterNameById(clusterId);
-        iDatabase.checkSecurity(ODatabaseSecurityResources.CLUSTER, ORole.PERMISSION_READ, clusterName);
-        listOfReadableIds.add(clusterId);
-      } catch (OSecurityAccessException securityException) {
-        all = false;
-        // if the cluster is inaccessible it's simply not processed in the list.add
-      }
-    }
-
-    if (all)
-      // JUST RETURN INPUT ARRAY (FASTER)
-      return iClusterIds;
-
-    int[] readableClusterIds = new int[listOfReadableIds.size()];
-    int index = 0;
-    for (int clusterId : listOfReadableIds) {
-      readableClusterIds[index++] = clusterId;
-    }
-
-    return readableClusterIds;
   }
 
   private ODatabaseRecord getDatabase() {
@@ -1151,7 +1151,8 @@ public class OClassImpl extends ODocumentWrapperNoClass implements OClass {
     if (properties.containsKey(lowerName))
       throw new OSchemaException("Class " + name + " already has property '" + iName + "'");
 
-    final OPropertyImpl prop = new OPropertyImpl(this, iName, iType);
+    final OPropertyImpl prop = new OPropertyImpl(this, iName, iType, persistentSize);
+    persistentSize += prop.getPersistentSize();
 
     properties.put(lowerName, prop);
 
@@ -1287,6 +1288,10 @@ public class OClassImpl extends ODocumentWrapperNoClass implements OClass {
     return indexManager.getClassIndexes(name);
   }
 
+  public int getPersistentSize() {
+    return persistentSize;
+  }
+
   public Set<OIndex<?>> getIndexes() {
     final Set<OIndex<?>> indexes = getClassIndexes();
     if (superClass == null)
@@ -1296,11 +1301,6 @@ public class OClassImpl extends ODocumentWrapperNoClass implements OClass {
     result.addAll(superClass.getIndexes());
 
     return result;
-  }
-
-  private void setPolymorphicClusterIds(final int[] iClusterIds) {
-    polymorphicClusterIds = iClusterIds;
-    Arrays.sort(polymorphicClusterIds);
   }
 
   private OClass setClusterIds(final int[] iClusterIds) {
