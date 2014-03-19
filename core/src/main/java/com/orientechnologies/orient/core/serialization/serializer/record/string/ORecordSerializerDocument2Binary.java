@@ -49,6 +49,11 @@ import com.orientechnologies.orient.core.serialization.serializer.record.ODocume
 public class ORecordSerializerDocument2Binary implements ODocumentSerializer {
   public static final String NAME = "doc2bin";
 
+  @Override
+  public boolean supportsPartial() {
+    return true;
+  }
+
   public ORecordInternal<?> fromStream(final ODatabaseRecord iDatabase, final byte[] iSource) {
     return fromStream(iSource, null, null);
   }
@@ -56,7 +61,7 @@ public class ORecordSerializerDocument2Binary implements ODocumentSerializer {
   @Override
   public ODocument fromStream(final byte[] iSource, final ORecordInternal<?> iRecord, final String[] iFieldNames) {
     ODocument record = (ODocument) iRecord;
-    if (iRecord == null)
+    if (record == null)
       record = new ODocument();
 
     record.fromStream(iSource);
@@ -155,6 +160,9 @@ public class ORecordSerializerDocument2Binary implements ODocumentSerializer {
     }
 
     final OBinarySerializer<Object> newSerializer = OBinarySerializerFactory.getInstance().getObjectSerializer(iFieldType);
+    if (newSerializer == null)
+      throw new IllegalArgumentException("no available binary serializer for type: " + iFieldType);
+
     final int newSize = newSerializer.getObjectSize(iFieldValue);
 
     // SCHEMA-LESS SECTION
@@ -213,8 +221,19 @@ public class ORecordSerializerDocument2Binary implements ODocumentSerializer {
   }
 
   @Override
-  public byte[] toStream(final ORecordInternal<?> iSource, final boolean iOnlyDelta) {
-    return iSource.toStream();
+  public byte[] toStream(final ORecordInternal<?> iRecord, final boolean iOnlyDelta) {
+    byte[] buffer = null;
+
+    ODocument document = (ODocument) iRecord;
+
+    if (document.getIdentity().isPersistent() && document.isTrackingChanges()) {
+      for (String fieldName : document.getDirtyFields())
+        buffer = fieldToStream(buffer, document, fieldName, document.getOriginalValue(fieldName), document.fieldType(fieldName));
+    } else
+      for (String fieldName : document.fieldNames())
+        buffer = fieldToStream(buffer, document, fieldName, document.getOriginalValue(fieldName), document.fieldType(fieldName));
+
+    return buffer;
   }
 
   @Override

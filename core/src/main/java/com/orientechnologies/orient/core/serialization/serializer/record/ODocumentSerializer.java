@@ -34,6 +34,8 @@ import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 
 public interface ODocumentSerializer extends ORecordSerializer {
+  boolean supportsPartial();
+
   public Object fieldFromStream(byte[] iSource, ODocument iRecord, String iFieldName);
 
   byte[] fieldToStream(byte[] iSource, ODocument iRecord, String iFieldName, Object iFieldValue, OType iFieldType);

@@ -782,11 +782,13 @@ public class OPropertyImpl extends ODocumentWrapperNoClass implements OProperty 
 
   protected void computePersistentSize() {
     final OBinarySerializer<Object> serializer = OBinarySerializerFactory.getInstance().getObjectSerializer(type);
-    if (serializer.isFixedLength())
-      persistentSize = serializer.getFixedLength();
-    else
-      // VARIABLE SIZE: FIXED SIZE = INT (OFFSET TO THE VAR CONTENT)
-      persistentSize = OIntegerSerializer.INT_SIZE;
-    isFixedSize = serializer.isFixedLength();
+    if (serializer != null) {
+      if (serializer.isFixedLength())
+        persistentSize = serializer.getFixedLength();
+      else
+        // VARIABLE SIZE: FIXED SIZE = INT (OFFSET TO THE VAR CONTENT)
+        persistentSize = OIntegerSerializer.INT_SIZE;
+      isFixedSize = serializer.isFixedLength();
+    }
   }
 }

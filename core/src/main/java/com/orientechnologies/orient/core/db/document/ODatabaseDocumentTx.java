@@ -40,7 +40,7 @@ import com.orientechnologies.orient.core.record.ORecordInternal;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.serialization.serializer.record.ORecordSerializer;
 import com.orientechnologies.orient.core.serialization.serializer.record.ORecordSerializerFactory;
-import com.orientechnologies.orient.core.serialization.serializer.record.string.ORecordSerializerSchemaAware2CSV;
+import com.orientechnologies.orient.core.serialization.serializer.record.string.ORecordSerializerDocument2Binary;
 import com.orientechnologies.orient.core.storage.ORecordCallback;
 import com.orientechnologies.orient.core.storage.OStorage;
 import com.orientechnologies.orient.core.storage.impl.local.OFreezableStorage;
@@ -56,7 +56,7 @@ import java.util.List;
 @SuppressWarnings("unchecked")
 public class ODatabaseDocumentTx extends ODatabaseRecordWrapperAbstract<ODatabaseRecordTx> implements ODatabaseDocument {
   protected static ORecordSerializer defaultSerializer = ORecordSerializerFactory.instance().getFormat(
-                                                           ORecordSerializerSchemaAware2CSV.NAME);
+                                                           ORecordSerializerDocument2Binary.NAME);
 
   public ODatabaseDocumentTx(final String iURL) {
     super(new ODatabaseRecordTx(iURL, ODocument.RECORD_TYPE));

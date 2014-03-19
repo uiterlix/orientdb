@@ -36,14 +36,14 @@ import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.serialization.OBase64Utils;
 import com.orientechnologies.orient.core.serialization.OBinaryProtocol;
 import com.orientechnologies.orient.core.serialization.serializer.OStringSerializerHelper;
-import com.orientechnologies.orient.core.serialization.serializer.record.ORecordSerializer;
+import com.orientechnologies.orient.core.serialization.serializer.record.ODocumentSerializer;
 import com.orientechnologies.orient.core.serialization.serializer.record.OSerializationSetThreadLocal;
 import com.orientechnologies.orient.core.serialization.serializer.string.OStringSerializerAnyStreamable;
 import com.orientechnologies.orient.core.serialization.serializer.string.OStringSerializerEmbedded;
 import com.orientechnologies.orient.core.util.ODateHelper;
 
 @SuppressWarnings("serial")
-public abstract class ORecordSerializerStringAbstract implements ORecordSerializer, Serializable {
+public abstract class ORecordSerializerStringAbstract implements ODocumentSerializer, Serializable {
   protected static final OProfilerMBean PROFILER              = Orient.instance().getProfiler();
   private static final char             DECIMAL_SEPARATOR     = '.';
   private static final String           MAX_INTEGER_AS_STRING = String.valueOf(Integer.MAX_VALUE);
@@ -148,6 +148,21 @@ public abstract class ORecordSerializerStringAbstract implements ORecordSerializ
     }
 
     throw new IllegalArgumentException("Type " + iType + " not supported to convert value: " + iValue);
+  }
+
+  @Override
+  public boolean supportsPartial(){
+    return false;
+  }
+
+  @Override
+  public Object fieldFromStream(byte[] iSource, ODocument iRecord, String iFieldName) {
+    return null;
+  }
+
+  @Override
+  public byte[] fieldToStream(byte[] iSource, ODocument iRecord, String iFieldName, Object iFieldValue, OType iFieldType) {
+    return new byte[0];
   }
 
   public static Object convertValue(final String iValue, final OType iExpectedType) {

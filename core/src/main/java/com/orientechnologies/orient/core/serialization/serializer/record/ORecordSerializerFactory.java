@@ -15,12 +15,13 @@
  */
 package com.orientechnologies.orient.core.serialization.serializer.record;
 
+import com.orientechnologies.orient.core.serialization.serializer.record.string.ORecordSerializerDocument2Binary;
+import com.orientechnologies.orient.core.serialization.serializer.record.string.ORecordSerializerJSON;
+import com.orientechnologies.orient.core.serialization.serializer.record.string.ORecordSerializerSchemaAware2CSV;
+
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-
-import com.orientechnologies.orient.core.serialization.serializer.record.string.ORecordSerializerJSON;
-import com.orientechnologies.orient.core.serialization.serializer.record.string.ORecordSerializerSchemaAware2CSV;
 
 /**
  * Factory of record serialized.
@@ -38,6 +39,7 @@ public class ORecordSerializerFactory {
 		defaultRecordFormat = new ORecordSerializerRaw();
 
 		register(ORecordSerializerSchemaAware2CSV.NAME, new ORecordSerializerSchemaAware2CSV());
+    register(ORecordSerializerDocument2Binary.NAME, new ORecordSerializerDocument2Binary());
 		register(ORecordSerializerJSON.NAME, new ORecordSerializerJSON());
 		register(ORecordSerializerRaw.NAME, defaultRecordFormat);
 	}
