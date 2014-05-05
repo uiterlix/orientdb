@@ -50,7 +50,6 @@ public class Orient extends OListenerManger<OOrientListener> {
 
   protected static final Orient                   instance               = new Orient();
   protected static boolean                        registerDatabaseByPath = false;
-
   protected final Map<String, OEngine>            engines                = new HashMap<String, OEngine>();
   protected final Map<String, OStorage>           storages               = new HashMap<String, OStorage>();
   protected final Set<ODatabaseLifecycleListener> dbLifecycleListeners   = new HashSet<ODatabaseLifecycleListener>();
@@ -63,8 +62,7 @@ public class Orient extends OListenerManger<OOrientListener> {
   protected ORecordFactoryManager                 recordFactoryManager   = new ORecordFactoryManager();
   protected OrientShutdownHook                    shutdownHook;
   protected OMemoryWatchDog                       memoryWatchDog;
-  protected OProfilerMBean                        profiler               = new OProfiler();                                            ;
-
+  protected OProfilerMBean                        profiler               = new OProfiler();
   protected ODatabaseThreadLocalFactory           databaseThreadFactory;
 
   protected volatile boolean                      active                 = false;

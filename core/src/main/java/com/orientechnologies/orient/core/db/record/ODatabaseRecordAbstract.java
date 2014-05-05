@@ -86,7 +86,10 @@ import com.orientechnologies.orient.core.version.ORecordVersion;
 import com.orientechnologies.orient.core.version.OVersionFactory;
 
 import java.util.*;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 @SuppressWarnings("unchecked")
 public abstract class ODatabaseRecordAbstract extends ODatabaseWrapperAbstract<ODatabaseRaw> implements ODatabaseRecord {
@@ -1506,6 +1509,17 @@ public abstract class ODatabaseRecordAbstract extends ODatabaseWrapperAbstract<O
    */
   public void setDataSegmentStrategy(ODataSegmentStrategy dataSegmentStrategy) {
     this.dataSegmentStrategy = dataSegmentStrategy;
+  }
+
+  @Override
+  public ThreadPoolExecutor getWorkers() {
+    return getStorage().getResource("workers", new Callable<ThreadPoolExecutor>() {
+      @Override
+      public ThreadPoolExecutor call() throws Exception {
+        final int cores = Runtime.getRuntime().availableProcessors();
+        return new ThreadPoolExecutor(cores, cores * 2, 10, TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(cores));
+      }
+    });
   }
 
   protected ORecordSerializer resolveFormat(final Object iObject) {

@@ -23,6 +23,7 @@ import com.orientechnologies.common.util.OPair;
 import com.orientechnologies.orient.core.command.OBasicCommandContext;
 import com.orientechnologies.orient.core.command.OCommandContext;
 import com.orientechnologies.orient.core.command.OCommandRequest;
+import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
 import com.orientechnologies.orient.core.db.record.ODatabaseRecord;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.exception.OCommandExecutionException;
@@ -58,11 +59,13 @@ import com.orientechnologies.orient.core.sql.operator.OQueryOperatorMajor;
 import com.orientechnologies.orient.core.sql.operator.OQueryOperatorMajorEquals;
 import com.orientechnologies.orient.core.sql.operator.OQueryOperatorMinor;
 import com.orientechnologies.orient.core.sql.operator.OQueryOperatorMinorEquals;
+import com.orientechnologies.orient.core.sql.query.OResultSet;
 import com.orientechnologies.orient.core.sql.query.OSQLQuery;
 import com.orientechnologies.orient.core.storage.OStorage;
 
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.concurrent.ArrayBlockingQueue;
 
 /**
  * Executes the SQL SELECT statement. the parse() method compiles the query and builds the meta information needed by the execute().
@@ -81,11 +84,10 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
   public static final String          KEYWORD_GROUP        = "GROUP";
   public static final String          KEYWORD_FETCHPLAN    = "FETCHPLAN";
   private static final String         KEYWORD_AS           = " AS ";
+  private static final String         KEYWORD_PARALLEL     = "PARALLEL";
   private Map<String, String>         projectionDefinition = null;
-  private Map<String, Object>         projections          = null;                                  // THIS HAS BEEN KEPT FOR
-                                                                                                     // COMPATIBILITY; BUT IT'S USED
-                                                                                                     // THE PROJECTIONS IN
-                                                                                                     // GROUPED-RESULTS
+  // THIS HAS BEEN KEPT FOR COMPATIBILITY; BUT IT'S USED THE PROJECTIONS IN GROUPED-RESULTS
+  private Map<String, Object>         projections          = null;
   private List<OPair<String, String>> orderedFields        = new ArrayList<OPair<String, String>>();
   private List<String>                groupByFields;
   private Map<Object, ORuntimeResult> groupedResult;
@@ -93,9 +95,11 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
   private int                         fetchLimit           = -1;
   private OIdentifiable               lastRecord;
   private String                      fetchPlan;
+  private volatile boolean            browsing;
 
   private boolean                     fullySortedByIndex   = false;
   private OStorage.LOCKING_STRATEGY   lockingStrategy      = OStorage.LOCKING_STRATEGY.DEFAULT;
+  private boolean                     parallel             = false;
 
   private final class IndexComparator implements Comparator<OIndex<?>> {
     public int compare(final OIndex<?> indexOne, final OIndex<?> indexTwo) {
@@ -296,11 +300,9 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
 
       while (!parserIsEnded()) {
         parserNextWord(true);
+        final String w = parserGetLastWord();
 
-        if (!parserIsEnded()) {
-
-          final String w = parserGetLastWord();
-
+        if (!w.isEmpty()) {
           if (w.equals(KEYWORD_WHERE)) {
             compiledFilter = OSQLEngine.getInstance().parseCondition(parserText.substring(parserGetCurrentPosition(), endPosition),
                 getContext(), KEYWORD_WHERE);
@@ -326,7 +328,9 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
 
             lockingStrategy = lock.equals("RECORD") ? OStorage.LOCKING_STRATEGY.KEEP_EXCLUSIVE_LOCK
                 : OStorage.LOCKING_STRATEGY.DEFAULT;
-          } else
+          } else if (w.equals(KEYWORD_PARALLEL))
+            parallel = parseParallel(w);
+          else
             throwParsingException("Invalid keyword '" + w + "'");
         }
       }
@@ -488,10 +492,17 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
     final long startFetching = System.currentTimeMillis();
     try {
 
-      // BROWSE ALL THE RECORDS
-      while (target.hasNext())
-        if (!executeSearchRecord(target.next()))
-          break;
+      final OResultSet result = (OResultSet) getResult();
+
+      if (parallel)
+        parallelExec(result);
+      else
+        // BROWSE; UNMARSHALL AND FILTER ALL THE RECORDS ON CURRENT THREAD
+        while (target.hasNext())
+          if (!executeSearchRecord(target.next()))
+            break;
+
+      request.getResultListener().end();
 
     } finally {
       context.setVariable("fetchingFromTargetElapsed", (System.currentTimeMillis() - startFetching));
@@ -996,6 +1007,72 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
     }
 
     return false;
+  }
+
+  private boolean parseParallel(String w) {
+    return w.equals(KEYWORD_PARALLEL);
+  }
+
+  private void parallelExec(OResultSet result) {
+    // BROWSE ALL THE RECORDS ON CURRENT THREAD BUT DELEGATE UNMARSHALLING AND FILTER TO A THREAD POOL
+    final ODatabaseRecord db = getDatabase();
+
+    if (limit > -1) {
+      if (result != null)
+        result.setLimit(limit);
+    }
+
+    final int cores = Runtime.getRuntime().availableProcessors();
+    final ArrayBlockingQueue<OIdentifiable> queue = new ArrayBlockingQueue<OIdentifiable>(cores);
+    OLogManager.instance().debug(this, "Parallel query against %d threads", cores);
+
+    browsing = true;
+
+    final Thread[] threads = new Thread[cores];
+    for (int i = 0; i < cores; ++i) {
+      threads[i] = new Thread(new Runnable() {
+        @Override
+        public void run() {
+          ODatabaseRecordThreadLocal.INSTANCE.set(db);
+
+          int processed = 0;
+          while (browsing) {
+            final OIdentifiable next;
+            try {
+              next = queue.take();
+              if (next != null) {
+                processed++;
+                if (!executeSearchRecord(next))
+                  browsing = false;
+              }
+            } catch (OCommandExecutionException e) {
+              break;
+            } catch (InterruptedException e) {
+              break;
+            }
+          }
+
+          OLogManager.instance().debug(this, "%s - Processed %d items", Thread.currentThread().getName(), processed);
+        }
+      }, "OrientDB Query executor " + i);
+      threads[i].start();
+    }
+
+    // BROWSE ALL THE RECORDS AND PUT THE RECORD INTO THE QUEUE
+    while (target.hasNext())
+      queue.offer(target.next());
+
+    browsing = false;
+
+    for (int i = 0; i < cores; ++i)
+      threads[i].interrupt();
+
+    // WAIT FOR ALL THE THREADS TO FINISH
+    for (int i = 0; i < cores; ++i)
+      try {
+        threads[i].join();
+      } catch (InterruptedException e) {
+      }
   }
 
   private int getQueryFetchLimit() {

@@ -15,9 +15,6 @@
  */
 package com.orientechnologies.orient.core.db;
 
-import java.util.List;
-import java.util.Map;
-
 import com.orientechnologies.orient.core.command.OCommandRequest;
 import com.orientechnologies.orient.core.db.object.ODatabaseObject;
 import com.orientechnologies.orient.core.db.record.ODatabaseRecord;
@@ -38,6 +35,10 @@ import com.orientechnologies.orient.core.storage.OStorage;
 import com.orientechnologies.orient.core.tx.OTransaction;
 import com.orientechnologies.orient.core.tx.OTransaction.TXTYPE;
 import com.orientechnologies.orient.core.version.ORecordVersion;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * Database interface that represents a complex database. It extends the base ODatabase interface adding all the higher-level APIs
@@ -360,7 +361,6 @@ public interface ODatabaseComplex<T extends Object> extends ODatabase, OUserObje
    * @param iCommand
    *          Command request to execute.
    * @return The same Command request received as parameter.
-   * @see com.orientechnologies.orient.client.remote.OStorageRemote
    */
   public <RET extends OCommandRequest> RET command(OCommandRequest iCommand);
 
@@ -452,4 +452,6 @@ public interface ODatabaseComplex<T extends Object> extends ODatabase, OUserObje
   public <DB extends ODatabaseComplex<?>> DB setMVCC(boolean iValue);
 
   public String getType();
+
+  public ThreadPoolExecutor getWorkers();
 }
