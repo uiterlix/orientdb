@@ -15,8 +15,6 @@
  */
 package com.orientechnologies.orient.core.command.script;
 
-import com.orientechnologies.common.log.OLogManager;
-
 import java.lang.reflect.Method;
 
 /**
@@ -36,29 +34,32 @@ public class OCommandExecutorUtility {
    * @param ob
    * @return
    */
-  public static Object transformResult(Object ob) {
-    // JAVA8 NASHORN COMPATIBILITY OR RETURNING ARRAYS
-    if (java8MethodIsArray != null || ob.getClass().getName().equals("jdk.nashorn.api.scripting.ScriptObjectMirror")) {
-      try {
-        if (java8MethodValues == null) {
-          //java8MethodIsArray = ob.getClass().getMethod("isArray");
-          java8MethodValues = ob.getClass().getMethod("values");
-          java8MethodValues.setAccessible(true);
-        }
-
-        Method m = ob.getClass().getMethod("entrySet");
-        m.setAccessible(true);
-        Object r = m.invoke(ob);
-
-        //        final Boolean isArray = (Boolean) java8MethodIsArray.invoke(ob);
+  public static Object transformResult(final Object ob) {
+//    if( ob == null )
+//      return ob
 //
-//        if (isArray)
-          return java8MethodValues.invoke(ob);
-
-      } catch (Exception e) {
-        OLogManager.instance().warn(OCommandExecutorUtility.class, "Error on conversion object from Nashorn engine", e);
-      }
-    }
+//    // JAVA8 NASHORN COMPATIBILITY OR RETURNING ARRAYS
+//    if (java8MethodIsArray != null || ob.getClass().getName().equals("jdk.nashorn.api.scripting.ScriptObjectMirror")) {
+//      try {
+//        if (java8MethodValues == null) {
+//          //java8MethodIsArray = ob.getClass().getMethod("isArray");
+//          java8MethodValues = ob.getClass().getMethod("values");
+//          java8MethodValues.setAccessible(true);
+//        }
+//
+//        Method m = ob.getClass().getMethod("entrySet");
+//        m.setAccessible(true);
+//        Object r = m.invoke(ob);
+//
+//        //        final Boolean isArray = (Boolean) java8MethodIsArray.invoke(ob);
+////
+////        if (isArray)
+//          return java8MethodValues.invoke(ob);
+//
+//      } catch (Exception e) {
+//        OLogManager.instance().warn(OCommandExecutorUtility.class, "Error on conversion object from Nashorn engine", e);
+//      }
+//    }
 
     return ob;
   }
