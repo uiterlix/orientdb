@@ -218,8 +218,8 @@ public class OWOWCache {
                     fileClassic.synch();
                     fileClassic.setSoftlyClosed(true);
 
-                    OLogManager.instance()
-                        .info(this, "Write inactivity interval was reached, file '" + fileName + "' was flushed.");
+                    if (OLogManager.instance().isDebugEnabled())
+                      OLogManager.instance().debug(this, "Write inactivity interval was reached, file '" + fileName + "' was flushed.");
                   }
 
                 } catch (Exception e) {
