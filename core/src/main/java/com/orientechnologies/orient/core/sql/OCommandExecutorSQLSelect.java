@@ -488,7 +488,7 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
       return;
     }
 
-    fetchFromTarget();
+    fetchFromTarget(target, true);
   }
 
   @Override
@@ -503,7 +503,7 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
     return true;
   }
 
-  protected boolean executeSearchRecord(final OIdentifiable id) {
+  protected boolean executeSearchRecord(final OIdentifiable id, boolean evaluateRecords) {
     if (Thread.interrupted())
       throw new OCommandExecutionException("The select execution has been interrupted");
 
@@ -992,19 +992,22 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
     return false;
   }
 
-  private void fetchFromTarget() {
+  private void fetchFromTarget(Iterator<? extends OIdentifiable> iTarget, final boolean evaluateRecords) {
     final long startFetching = System.currentTimeMillis();
     try {
 
-      final OResultSet result = (OResultSet) getResult();
-
       if (parallel)
-        parallelExec(result);
+        parallelExec(iTarget);
       else
         // BROWSE; UNMARSHALL AND FILTER ALL THE RECORDS ON CURRENT THREAD
-        while (target.hasNext())
-          if (!executeSearchRecord(target.next()))
+        while (iTarget.hasNext()) {
+          final OIdentifiable next = iTarget.next();
+          if (next == null)
             break;
+
+          if (!executeSearchRecord(next, evaluateRecords))
+            break;
+        }
 
     } finally {
       context.setVariable("fetchingFromTargetElapsed", (System.currentTimeMillis() - startFetching));
@@ -1015,7 +1018,9 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
     return w.equals(KEYWORD_PARALLEL);
   }
 
-  private void parallelExec(OResultSet result) {
+  private void parallelExec(final Iterator<? extends OIdentifiable> iTarget) {
+    final OResultSet result = (OResultSet) getResult();
+
     // BROWSE ALL THE RECORDS ON CURRENT THREAD BUT DELEGATE UNMARSHALLING AND FILTER TO A THREAD POOL
     final ODatabaseRecord db = getDatabase();
 
@@ -1038,13 +1043,13 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
           ODatabaseRecordThreadLocal.INSTANCE.set(db);
 
           int processed = 0;
-          while (browsing) {
+          while (true) {
             final OIdentifiable next;
             try {
               next = queue.take();
               if (next != null) {
                 processed++;
-                if (!executeSearchRecord(next))
+                if (!executeSearchRecord(next, true))
                   browsing = false;
               }
             } catch (OCommandExecutionException e) {
@@ -1061,8 +1066,14 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
     }
 
     // BROWSE ALL THE RECORDS AND PUT THE RECORD INTO THE QUEUE
-    while (browsing && target.hasNext())
-      queue.offer(target.next());
+    while (browsing && iTarget.hasNext()) {
+      final OIdentifiable next = iTarget.next();
+
+      if (next == null)
+        break;
+
+      queue.offer(next);
+    }
 
     browsing = false;
 
@@ -1297,31 +1308,33 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
     return false;
   }
 
-  private void fetchValuesFromIndexCursor(final OIndexCursor cursor, boolean evaluateRecords) {
+  private void fetchValuesFromIndexCursor(final OIndexCursor cursor, final boolean evaluateRecords) {
     int needsToFetch;
     if (fetchLimit > 0)
       needsToFetch = fetchLimit + skip;
     else
       needsToFetch = -1;
 
-    Entry<Object, OIdentifiable> entryRecord = cursor.nextEntry();
-    if (needsToFetch > 0)
-      needsToFetch--;
-
-    while (entryRecord != null) {
-      final OIdentifiable identifiable = entryRecord.getValue();
-      final ORecord record = identifiable.getRecord();
-
-      if (filter(record, evaluateRecords))
-        if (!handleResult(record, true))
-          // LIMIT REACHED
-          break;
-
-      entryRecord = cursor.nextEntry();
-
-      if (needsToFetch > 0)
-        needsToFetch--;
-    }
+    cursor.setPrefetchSize(needsToFetch);
+    fetchFromTarget(cursor, evaluateRecords);
+    //
+    // Entry<Object, OIdentifiable> entryRecord = cursor.nextEntry();
+    // if (needsToFetch > 0)
+    // needsToFetch--;
+    //
+    // while (entryRecord != null) {
+    // final OIdentifiable identifiable = entryRecord.getValue();
+    // final ORecord record = identifiable.getRecord();
+    //
+    // if (!executeSearchRecord(record, evaluateRecords))
+    // // LIMIT REACHED
+    // break;
+    //
+    // entryRecord = cursor.nextEntry();
+    //
+    // if (needsToFetch > 0)
+    // needsToFetch--;
+    // }
   }
 
   private void fetchEntriesFromIndexCursor(final OIndexCursor cursor) {
