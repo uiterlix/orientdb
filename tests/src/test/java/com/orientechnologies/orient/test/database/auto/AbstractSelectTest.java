@@ -2,7 +2,6 @@ package com.orientechnologies.orient.test.database.auto;
 
 import com.orientechnologies.orient.core.command.OCommandResultListener;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocument;
-import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.record.impl.ODocumentHelper;
 import com.orientechnologies.orient.core.sql.query.OSQLAsynchQuery;
@@ -19,15 +18,19 @@ public abstract class AbstractSelectTest {
     final List<ODocument> asynchResult = new ArrayList<ODocument>();
     final AtomicBoolean endWasCalled = new AtomicBoolean();
 
+    System.out.println("Executing asynch command (" + sql + "). Waiting for " + synchResult.size() + " records");
+
     db.query(new OSQLAsynchQuery<ODocument>(sql, new OCommandResultListener() {
       @Override
       public boolean result(Object iRecord) {
+        System.out.println("- Received asynch record: " + iRecord);
         asynchResult.add((ODocument) iRecord);
         return true;
       }
 
       @Override
       public void end() {
+        System.out.println("- END");
         endWasCalled.set(true);
       }
     }), args);

@@ -40,7 +40,6 @@ import com.orientechnologies.orient.core.metadata.security.ODatabaseSecurityReso
 import com.orientechnologies.orient.core.metadata.security.ORole;
 import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.record.ORecordInternal;
-import com.orientechnologies.orient.core.record.ORecordSchemaAware;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.record.impl.ODocumentHelper;
 import com.orientechnologies.orient.core.serialization.serializer.OStringSerializerHelper;
@@ -489,24 +488,7 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
       return;
     }
 
-    final long startFetching = System.currentTimeMillis();
-    try {
-
-      final OResultSet result = (OResultSet) getResult();
-
-      if (parallel)
-        parallelExec(result);
-      else
-        // BROWSE; UNMARSHALL AND FILTER ALL THE RECORDS ON CURRENT THREAD
-        while (target.hasNext())
-          if (!executeSearchRecord(target.next()))
-            break;
-
-      request.getResultListener().end();
-
-    } finally {
-      context.setVariable("fetchingFromTargetElapsed", (System.currentTimeMillis() - startFetching));
-    }
+    fetchFromTarget();
   }
 
   @Override
@@ -556,9 +538,9 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
 
       context.updateMetric("documentReads", +1);
 
-      if (filter(record))
+      if (filter(record, true))
         if (!handleResult(record, true))
-          // END OF EXECUTION
+          // LIMIT REACHED
           return false;
     } finally {
       if (record != null)
@@ -571,6 +553,15 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
     return true;
   }
 
+  /**
+   * Handles the record in result.
+   * 
+   * @param iRecord
+   *          Record to handle
+   * @param iCloneIt
+   *          Clone the record
+   * @return false if limit has been reached, otherwise true
+   */
   protected boolean handleResult(final OIdentifiable iRecord, final boolean iCloneIt) {
     lastRecord = null;
 
@@ -910,14 +901,6 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
     return endPos;
   }
 
-  protected void parseIndexSearchResult(final Collection<ODocument> entries) {
-    for (final ODocument document : entries) {
-      final boolean continueResultParsing = handleResult(document, false);
-      if (!continueResultParsing)
-        break;
-    }
-  }
-
   /**
    * Parses the fetchplan keyword if found.
    */
@@ -1007,6 +990,25 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
     }
 
     return false;
+  }
+
+  private void fetchFromTarget() {
+    final long startFetching = System.currentTimeMillis();
+    try {
+
+      final OResultSet result = (OResultSet) getResult();
+
+      if (parallel)
+        parallelExec(result);
+      else
+        // BROWSE; UNMARSHALL AND FILTER ALL THE RECORDS ON CURRENT THREAD
+        while (target.hasNext())
+          if (!executeSearchRecord(target.next()))
+            break;
+
+    } finally {
+      context.setVariable("fetchingFromTargetElapsed", (System.currentTimeMillis() - startFetching));
+    }
   }
 
   private boolean parseParallel(String w) {
@@ -1295,52 +1297,43 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
     return false;
   }
 
-  private void fetchValuesFromIndexCursor(OIndexCursor cursor, boolean evaluateRecords) {
+  private void fetchValuesFromIndexCursor(final OIndexCursor cursor, boolean evaluateRecords) {
     int needsToFetch;
     if (fetchLimit > 0)
       needsToFetch = fetchLimit + skip;
     else
       needsToFetch = -1;
 
-    Entry<Object, OIdentifiable> entryRecord = cursor.next(needsToFetch);
+    Entry<Object, OIdentifiable> entryRecord = cursor.nextEntry();
     if (needsToFetch > 0)
       needsToFetch--;
 
-    cursorLoop: while (entryRecord != null) {
+    while (entryRecord != null) {
       final OIdentifiable identifiable = entryRecord.getValue();
       final ORecord record = identifiable.getRecord();
 
-      if (record instanceof ORecordSchemaAware<?>) {
-        final ORecordSchemaAware<?> recordSchemaAware = (ORecordSchemaAware<?>) record;
-        final Map<OClass, String> targetClasses = parsedTarget.getTargetClasses();
-        if ((targetClasses != null) && (!targetClasses.isEmpty())) {
-          for (OClass targetClass : targetClasses.keySet()) {
-            if (!targetClass.isSuperClassOf(recordSchemaAware.getSchemaClass()))
-              continue cursorLoop;
-          }
-        }
-      }
-
-      if (compiledFilter == null || !evaluateRecords || evaluateRecord(record)) {
+      if (filter(record, evaluateRecords))
         if (!handleResult(record, true))
+          // LIMIT REACHED
           break;
-      }
 
-      entryRecord = cursor.next(needsToFetch);
+      entryRecord = cursor.nextEntry();
 
       if (needsToFetch > 0)
         needsToFetch--;
     }
   }
 
-  private void fetchEntriesFromIndexCursor(OIndexCursor cursor) {
+  private void fetchEntriesFromIndexCursor(final OIndexCursor cursor) {
     int needsToFetch;
     if (fetchLimit > 0)
       needsToFetch = fetchLimit + skip;
     else
       needsToFetch = -1;
 
-    Entry<Object, OIdentifiable> entryRecord = cursor.next(needsToFetch);
+    cursor.setPrefetchSize(needsToFetch);
+
+    Entry<Object, OIdentifiable> entryRecord = cursor.nextEntry();
     if (needsToFetch > 0)
       needsToFetch--;
 
@@ -1351,12 +1344,15 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
       doc.unsetDirty();
 
       if (!handleResult(doc, false))
+        // LIMIT REACHED
         break;
 
-      entryRecord = cursor.next(needsToFetch);
-
-      if (needsToFetch > 0)
+      if (needsToFetch > 0) {
         needsToFetch--;
+        cursor.setPrefetchSize(needsToFetch);
+      }
+
+      entryRecord = cursor.nextEntry();
     }
   }
 
@@ -1559,13 +1555,16 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
         }
 
         if (res != null)
-          if (res instanceof Collection<?>)
+          if (res instanceof Collection<?>) {
             // MULTI VALUES INDEX
             for (final OIdentifiable r : (Collection<OIdentifiable>) res)
-              handleResult(createIndexEntryAsDocument(keyValue, r.getIdentity()), true);
-          else
+              if (!handleResult(createIndexEntryAsDocument(keyValue, r.getIdentity()), true))
+                // LIMIT REACHED
+                break;
+          } else {
             // SINGLE VALUE INDEX
             handleResult(createIndexEntryAsDocument(keyValue, ((OIdentifiable) res).getIdentity()), true);
+          }
       }
 
     } else {

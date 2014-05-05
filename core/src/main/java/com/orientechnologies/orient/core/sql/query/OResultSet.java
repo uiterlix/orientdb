@@ -58,7 +58,7 @@ public class OResultSet<T> implements List<T> {
   }
 
   public T set(int index, T element) {
-    throw new UnsupportedOperationException("set");
+    return underlying.set(index, element);
   }
 
   @Override
@@ -78,8 +78,9 @@ public class OResultSet<T> implements List<T> {
   }
 
   @Override
-  public boolean contains(Object o) {
-    throw new UnsupportedOperationException("set");
+  public boolean contains(final Object o) {
+    waitForCompletion();
+    return underlying.contains(o);
   }
 
   @Override
@@ -124,12 +125,12 @@ public class OResultSet<T> implements List<T> {
 
   @Override
   public Object[] toArray() {
-    throw new UnsupportedOperationException("set");
+    return underlying.toArray();
   }
 
   @Override
   public <T1> T1[] toArray(T1[] a) {
-    throw new UnsupportedOperationException("set");
+    return underlying.toArray(a);
   }
 
   public boolean add(T t) {
