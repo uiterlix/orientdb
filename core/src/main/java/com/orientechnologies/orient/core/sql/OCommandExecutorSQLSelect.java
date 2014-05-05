@@ -1024,7 +1024,7 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
 
     final int cores = Runtime.getRuntime().availableProcessors();
     final ArrayBlockingQueue<OIdentifiable> queue = new ArrayBlockingQueue<OIdentifiable>(cores);
-    OLogManager.instance().debug(this, "Parallel query against %d threads", cores);
+    OLogManager.instance().warn(this, "Parallel query against %d threads", cores);
 
     browsing = true;
 
@@ -1052,14 +1052,14 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
             }
           }
 
-          OLogManager.instance().debug(this, "%s - Processed %d items", Thread.currentThread().getName(), processed);
+          OLogManager.instance().warn(this, "%s - Processed %d items", Thread.currentThread().getName(), processed);
         }
       }, "OrientDB Query executor " + i);
       threads[i].start();
     }
 
     // BROWSE ALL THE RECORDS AND PUT THE RECORD INTO THE QUEUE
-    while (target.hasNext())
+    while (browsing && target.hasNext())
       queue.offer(target.next());
 
     browsing = false;
