@@ -199,7 +199,9 @@ public class OCommandExecutorSQLInsert extends OCommandExecutorSQLSetAware imple
       ((ODocument) rec).setClassName(className);
 
     rec.setDirty();
-    saveRecord(rec);
+    synchronized (this) {
+      saveRecord(rec);
+    }
 
     return true;
   }

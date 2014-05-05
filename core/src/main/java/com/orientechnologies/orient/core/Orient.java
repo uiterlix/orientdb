@@ -42,6 +42,9 @@ import com.orientechnologies.orient.core.storage.fs.OMMapManagerLocator;
 import java.io.IOException;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Orient extends OListenerManger<OOrientListener> {
@@ -66,6 +69,7 @@ public class Orient extends OListenerManger<OOrientListener> {
   protected ODatabaseThreadLocalFactory           databaseThreadFactory;
 
   protected volatile boolean                      active                 = false;
+  protected ThreadPoolExecutor                    workers;
 
   protected Orient() {
     super(new OAdaptiveLock(OGlobalConfiguration.ENVIRONMENT_CONCURRENT.getValueAsBoolean()));
@@ -120,6 +124,9 @@ public class Orient extends OListenerManger<OOrientListener> {
 
       shutdownHook = new OrientShutdownHook();
 
+      final int cores = Runtime.getRuntime().availableProcessors();
+      workers = new ThreadPoolExecutor(cores, cores * 3, 10, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+
       // REGISTER THE EMBEDDED ENGINE
       registerEngine(new OEngineLocal());
       registerEngine(new OEngineLocalPaginated());
@@ -150,6 +157,8 @@ public class Orient extends OListenerManger<OOrientListener> {
         return this;
 
       active = false;
+
+      workers.shutdown();
 
       OLogManager.instance().debug(this, "Orient Engine is shutting down...");
 
@@ -222,6 +231,10 @@ public class Orient extends OListenerManger<OOrientListener> {
       }
       storages.clear();
     }
+  }
+
+  public ThreadPoolExecutor getWorkers() {
+    return workers;
   }
 
   public OStorage loadStorage(String iURL) {

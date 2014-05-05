@@ -20,7 +20,6 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ThreadPoolExecutor;
 
 import com.orientechnologies.orient.core.command.OCommandOutputListener;
 import com.orientechnologies.orient.core.command.OCommandRequest;
@@ -403,11 +402,6 @@ public abstract class ODatabaseRecordWrapperAbstract<DB extends ODatabaseRecord>
         return null;
       }
     }, iListener, compressionLevel, bufferSize);
-  }
-
-  @Override
-  public ThreadPoolExecutor getWorkers() {
-    return underlying.getWorkers();
   }
 
   protected void checkClusterBoundedToClass(final int iClusterId) {

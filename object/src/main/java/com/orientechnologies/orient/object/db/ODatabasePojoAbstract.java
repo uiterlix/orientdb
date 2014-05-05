@@ -82,11 +82,6 @@ public abstract class ODatabasePojoAbstract<T extends Object> extends ODatabaseW
     super.close();
   }
 
-  @Override
-  public ThreadPoolExecutor getWorkers() {
-    return underlying.getWorkers();
-  }
-
   public OTransaction getTransaction() {
     return underlying.getTransaction();
   }

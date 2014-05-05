@@ -291,19 +291,20 @@ public abstract class OCommandExecutorSQLResultsetAbstract extends OCommandExecu
   protected boolean filter(final ORecord<?> iRecord, final boolean iEvaluateRecords) {
     context.setVariable("current", iRecord);
 
-    if (iRecord instanceof ORecordSchemaAware<?>) {
-      // CHECK THE TARGET CLASS
-      final ORecordSchemaAware<?> recordSchemaAware = (ORecordSchemaAware<?>) iRecord;
-      Map<OClass, String> targetClasses = parsedTarget.getTargetClasses();
-      // check only classes that specified in query will go to result set
-      if ((targetClasses != null) && (!targetClasses.isEmpty())) {
-        for (OClass targetClass : targetClasses.keySet()) {
-          if (!targetClass.isSuperClassOf(recordSchemaAware.getSchemaClass()))
-            return false;
+    if (iEvaluateRecords)
+      if (iRecord instanceof ORecordSchemaAware<?>) {
+        // CHECK THE TARGET CLASS
+        final ORecordSchemaAware<?> recordSchemaAware = (ORecordSchemaAware<?>) iRecord;
+        Map<OClass, String> targetClasses = parsedTarget.getTargetClasses();
+        // check only classes that specified in query will go to result set
+        if ((targetClasses != null) && (!targetClasses.isEmpty())) {
+          for (OClass targetClass : targetClasses.keySet()) {
+            if (!targetClass.isSuperClassOf(recordSchemaAware.getSchemaClass()))
+              return false;
+          }
+          context.updateMetric("documentAnalyzedCompatibleClass", +1);
         }
-        context.updateMetric("documentAnalyzedCompatibleClass", +1);
       }
-    }
 
     if (iEvaluateRecords)
       return evaluateRecord(iRecord);

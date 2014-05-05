@@ -20,6 +20,7 @@ import com.orientechnologies.common.collection.OMultiValue;
 import com.orientechnologies.common.concur.resource.OSharedResource;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.common.util.OPair;
+import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.command.OBasicCommandContext;
 import com.orientechnologies.orient.core.command.OCommandContext;
 import com.orientechnologies.orient.core.command.OCommandRequest;
@@ -64,7 +65,8 @@ import com.orientechnologies.orient.core.storage.OStorage;
 
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * Executes the SQL SELECT statement. the parse() method compiles the query and builds the meta information needed by the execute().
@@ -94,7 +96,7 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
   private int                         fetchLimit           = -1;
   private OIdentifiable               lastRecord;
   private String                      fetchPlan;
-  private volatile boolean            browsing;
+  private volatile boolean            executing;
 
   private boolean                     fullySortedByIndex   = false;
   private OStorage.LOCKING_STRATEGY   lockingStrategy      = OStorage.LOCKING_STRATEGY.DEFAULT;
@@ -538,7 +540,7 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
 
       context.updateMetric("documentReads", +1);
 
-      if (filter(record, true))
+      if (filter(record, evaluateRecords))
         if (!handleResult(record, true))
           // LIMIT REACHED
           return false;
@@ -1030,62 +1032,52 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
     }
 
     final int cores = Runtime.getRuntime().availableProcessors();
-    final ArrayBlockingQueue<OIdentifiable> queue = new ArrayBlockingQueue<OIdentifiable>(cores);
     OLogManager.instance().warn(this, "Parallel query against %d threads", cores);
 
-    browsing = true;
+    final ThreadPoolExecutor workers = Orient.instance().getWorkers();
 
-    final Thread[] threads = new Thread[cores];
-    for (int i = 0; i < cores; ++i) {
-      threads[i] = new Thread(new Runnable() {
-        @Override
-        public void run() {
-          ODatabaseRecordThreadLocal.INSTANCE.set(db);
-
-          int processed = 0;
-          while (true) {
-            final OIdentifiable next;
-            try {
-              next = queue.take();
-              if (next != null) {
-                processed++;
-                if (!executeSearchRecord(next, true))
-                  browsing = false;
-              }
-            } catch (OCommandExecutionException e) {
-              break;
-            } catch (InterruptedException e) {
-              break;
-            }
-          }
-
-          OLogManager.instance().warn(this, "%s - Processed %d items", Thread.currentThread().getName(), processed);
-        }
-      }, "OrientDB Query executor " + i);
-      threads[i].start();
-    }
+    executing = true;
+    final List<Future<?>> jobs = new ArrayList<Future<?>>();
 
     // BROWSE ALL THE RECORDS AND PUT THE RECORD INTO THE QUEUE
-    while (browsing && iTarget.hasNext()) {
+    while (executing && iTarget.hasNext()) {
       final OIdentifiable next = iTarget.next();
 
       if (next == null)
         break;
 
-      queue.offer(next);
+      final Runnable job = new Runnable() {
+        @Override
+        public void run() {
+          ODatabaseRecordThreadLocal.INSTANCE.set(db);
+
+          if (!executeSearchRecord(next, true))
+            executing = false;
+        }
+      };
+
+      jobs.add(workers.submit(job));
     }
 
-    browsing = false;
+    OLogManager.instance().warn(this, "%s - Scheduled %d jobs, waiting for completion", Thread.currentThread().getName(),
+        jobs.size());
 
-    for (int i = 0; i < cores; ++i)
-      threads[i].interrupt();
+    int processed = 0;
+    int total = jobs.size();
+    try {
+      for (Future<?> j : jobs) {
+        j.get();
+        processed++;
 
-    // WAIT FOR ALL THE THREADS TO FINISH
-    for (int i = 0; i < cores; ++i)
-      try {
-        threads[i].join();
-      } catch (InterruptedException e) {
+        if (processed % (total / 10) == 0)
+          OLogManager.instance().warn(this, "Executed %d/%d", processed, total);
       }
+    } catch (Exception e) {
+      OLogManager.instance().error(this, "Error on executing parallel query: %s", e, parserText);
+    }
+
+    OLogManager.instance().warn(this, "%s - End %d jobs", Thread.currentThread().getName(), jobs.size());
+
   }
 
   private int getQueryFetchLimit() {
