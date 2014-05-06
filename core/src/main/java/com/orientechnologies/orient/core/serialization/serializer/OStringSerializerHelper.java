@@ -214,7 +214,7 @@ public abstract class OStringSerializerHelper {
           buffer.setLength(0);
         }
 
-        startSeparatorAt = 0;
+        startSeparatorAt = beginIndex;
 
         if (beginIndex > -1) {
           final char lastSeparator = source[beginIndex - 1];
@@ -222,7 +222,7 @@ public abstract class OStringSerializerHelper {
             if (iRecordSeparator[i] == lastSeparator) {
               if (iRecordSeparatorIncludeAsPostfix[i]) {
                 beginIndex--;
-                startSeparatorAt = 1;
+                startSeparatorAt = beginIndex + 1;
               }
               break;
             }
@@ -264,13 +264,13 @@ public abstract class OStringSerializerHelper {
 
     // JUMP FIRST CHARS
     int i = beginIndex;
-    for (; i < iSource.length; ++i) {
+    for (; i < max; ++i) {
       final char c = iSource[i];
       if (!isCharPresent(c, iJumpChars))
         break;
     }
 
-    for (; i < iSource.length; ++i) {
+    for (; i < max; ++i) {
       final char c = iSource[i];
 
       if (stringBeginChar == ' ') {
@@ -284,7 +284,7 @@ public abstract class OStringSerializerHelper {
             if (i < iMinPosSeparatorAreValid || insideParenthesis > 0 || insideList > 0 || !isCharPresent(c, iSeparator)) {
               if (insideList == 0)
                 throw new OSerializationException("Found invalid " + LIST_END + " character at position " + i + " of text "
-                    + iSource + ". Ensure it is opened and closed correctly.");
+                    + new String(iSource) + ". Ensure it is opened and closed correctly.");
               insideList--;
             }
           } else if (c == EMBEDDED_BEGIN) {
@@ -293,7 +293,7 @@ public abstract class OStringSerializerHelper {
             // if (!isCharPresent(c, iRecordSeparator)) {
             if (insideParenthesis == 0)
               throw new OSerializationException("Found invalid " + EMBEDDED_END + " character at position " + i + " of text "
-                  + iSource + ". Ensure it is opened and closed correctly.");
+                  + new String(iSource) + ". Ensure it is opened and closed correctly.");
             // }
             insideParenthesis--;
 
@@ -303,7 +303,7 @@ public abstract class OStringSerializerHelper {
             if (i < iMinPosSeparatorAreValid || !isCharPresent(c, iSeparator)) {
               if (insideMap == 0)
                 throw new OSerializationException("Found invalid " + MAP_END + " character at position " + i + " of text "
-                    + iSource + ". Ensure it is opened and closed correctly.");
+                    + new String(iSource) + ". Ensure it is opened and closed correctly.");
               insideMap--;
             }
           } else if (c == LINK)
@@ -320,7 +320,7 @@ public abstract class OStringSerializerHelper {
                 if (i < iMinPosSeparatorAreValid || !isCharPresent(c, iSeparator)) {
                   if (insideSet == 0)
                     throw new OSerializationException("Found invalid " + SET_END + " character at position " + i + " of text "
-                        + iSource + ". Ensure it is opened and closed correctly.");
+                        + new String(iSource) + ". Ensure it is opened and closed correctly.");
                   insideSet--;
                 }
               }
