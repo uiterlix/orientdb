@@ -125,7 +125,20 @@ public class Orient extends OListenerManger<OOrientListener> {
       shutdownHook = new OrientShutdownHook();
 
       final int cores = Runtime.getRuntime().availableProcessors();
-      workers = new ThreadPoolExecutor(cores, cores * 3, 10, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+
+      workers = new ThreadPoolExecutor(cores, cores * 3, 10, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(cores * 500) {
+        @Override
+        public boolean offer(Runnable e) {
+          // turn offer() and add() into a blocking calls (unless interrupted)
+          try {
+            put(e);
+            return true;
+          } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+          }
+          return false;
+        }
+      });
 
       // REGISTER THE EMBEDDED ENGINE
       registerEngine(new OEngineLocal());
